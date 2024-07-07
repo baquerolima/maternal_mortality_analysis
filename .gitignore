@@ -4,3 +4,4 @@ venv/
 .ipynb_checkpoints/
 *.dmd
 modelo_dimensional/
+*testes*
