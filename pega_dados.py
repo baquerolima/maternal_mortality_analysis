@@ -40,9 +40,9 @@ lista_sinasc = pega_urls(BASE_URL + 'SINASC')
 
 for arquivo in lista_sim:
     print(arquivo[0], arquivo[1])
-    gera_arquivo(url=arquivo[1], name=f"sim_{arquivo[0]}")
+    # gera_arquivo(url=arquivo[1], name=f"sim_{arquivo[0]}")
 
 for arquivo in lista_sinasc:
     print(arquivo[0], arquivo[1])
-    gera_arquivo(url=arquivo[1], name=f"sinasc_{arquivo[0]}")
+    # gera_arquivo(url=arquivo[1], name=f"sinasc_{arquivo[0]}")
 
