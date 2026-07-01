@@ -1,5 +1,4 @@
-dados_SIM/
-dados_SINASC/
+arquivos/
 venv/
 .ipynb_checkpoints/
 *.dmd
