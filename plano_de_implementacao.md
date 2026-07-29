@@ -8,10 +8,10 @@
 
 | Decisão | Escolha |
 |---|---|
-| Filtro de mortes maternas | **Sexo feminino** (F/2) AND **Idade entre 10 e 49 anos** (IDADE entre "410" e "449", onde 4=unidade ano). **Exceção (outlier):** registros com Sexo NÃO-feminino (M/1/I/0/9) AND TPMORTEOCO ∈ {1,2,3,4,5} também incluídos (possíveis pessoas trans + casos com sexo ignorado) |
-| Sexo | Atributo **direto** na fato (`sexo CHAR(1)`) — valores originais '1','2','0','9'. Sem dimensão própria (cardinalidade baixa, sem valor analítico no domínio de mortalidade materna) |
-| Escolaridade | **Descartado** — não haverá Dim_Escolaridade |
-| Estado civil | **Descartado** — não haverá atributo direto estcivil |
+| Filtro de mortes maternas | (SEXO = 'F' AND IDADE BETWEEN '410' AND '449') OR (SEXO IN ('M','I') AND TPMORTEOCO ∈ {1,2,3,4,5}). SEXO normalizado no ETL: 'F' (F/2), 'M' (M/1), 'I' (I/0/9/outros) |
+| Escolaridade | **Descartado** -- não haverá Dim_Escolaridade |
+| Estado civil | **Descartado** -- não haverá atributo direto `estcivil` |
+| Sexo | Atributo **direto** na fato (`sexo CHAR(1)`). Normalizado no ETL com CHECK constraint: sexo IN ('F','M','I'). Valores originais do SIM (1/2/F/M/I/0/9) são mapeados para 'F','M','I' |
 | Filhos | **Descartado** — não haverá Dim_FaixaFilhos |
 | CNES | **Sub-dimensões snowflake** para natureza org, gestão, hierarquia, esfera, tipo unidade, natureza jurídica |
 | Bairro | **Independente** — `Dim_Bairro` com FK direta da fato |
@@ -232,26 +232,33 @@ Faixas: 0-21, 22-27, 28-31, 32-36, 37-41, 42+
 
 Os registros do SIM são filtrados para incluir apenas mortes potencialmente maternas, seguindo a regra:
 
+#### Filtro de mortes maternas
+```
+(SEXO = 'F' AND IDADE BETWEEN '410' AND '449')
+OR (SEXO IN ('M', 'I') AND TPMORTEOCO IN ('1','2','3','4','5'))
+```
+Onde SEXO foi normalizado no ETL: 'F' (F ou 2 no SIM), 'M' (M ou 1), 'I' (I, 0, 9 ou demais).
+
 ### Regra principal: Mulheres em idade fértil
 ```
-SEXO IN ('F', '2')
+SEXO = 'F'
 AND IDADE BETWEEN '410' AND '449'
 ```
 
 > **Decodificação do IDADE:** campo de 3 dígitos: o 1º dígito é a unidade (`4` = ano) e os 2 dígitos seguintes são a quantidade. Logo, `"410"` = 10 anos e `"449"` = 49 anos.
 
-### Exceção (outlier): Homens ou sexo ignorado com marcador de mortalidade materna
+### Exceção (outlier): Sexo M ou I com marcador de mortalidade materna
 ```
-SEXO IN ('M', '1', 'I', '0', '9')
+SEXO IN ('M', 'I')
 AND TPMORTEOCO IN ('1', '2', '3', '4', '5')
 ```
 
-Registros masculinos ou com sexo ignorado que possuem `TPMORTEOCO` indicando circunstância gestacional são incluídos como possíveis casos de pessoas trans ou erros de preenchimento — uma verificação de qualidade dos dados.
+Registros de sexo masculino ou ignorado que possuem `TPMORTEOCO` indicando circunstância gestacional são incluídos como possíveis casos de pessoas trans ou erros de preenchimento — uma verificação de qualidade dos dados.
 
 ### Filtro final (SQL-like)
 ```sql
-WHERE (SEXO IN ('F', '2') AND IDADE BETWEEN '410' AND '449')
-   OR (SEXO IN ('M', '1', 'I', '0', '9') AND TPMORTEOCO IN ('1', '2', '3', '4', '5'))
+WHERE (SEXO = 'F' AND IDADE BETWEEN '410' AND '449')
+   OR (SEXO IN ('M', 'I') AND TPMORTEOCO IN ('1', '2', '3', '4', '5'))
 ```
 
 ---
@@ -264,25 +271,25 @@ Grão: combinação única de dimensões (1 registro por combinação)
 
 | Coluna | Tipo | Origem |
 |---|---|---|
-| id_tempo **NOT NULL** | INT FK → Dim_Tempo | DTOBITO |
+| id_tempo | INT FK → Dim_Tempo | DTOBITO |
 | id_municipio_ocorrencia | INT FK → Dim_Municipio **NOT NULL** | CODMUNOCOR |
 | id_municipio_residencia | INT FK → Dim_Municipio nullable | CODMUNRES |
 | id_municipio_estabelecimento | INT FK → Dim_Municipio nullable | CO_IBGE (CNES) |
 | id_bairro_ocorrencia | INT FK → Dim_Bairro nullable | NO_BAIRRO (CNES) |
 | id_estabelecimento_saude | INT FK → Dim_EstabelecimentoSaude nullable | CODESTAB |
-| id_faixa_etaria | INT FK → Dim_FaixaEtaria nullable | IDADE |
-| id_raca_cor | INT FK → Dim_RacaCor nullable | RACACOR |
-| id_local_ocorrencia | INT FK → Dim_LocalOcorrencia nullable | LOCOCOR |
-| id_situacao_gestacional | INT FK → Dim_SituacaoGestacionalObito nullable | TPMORTEOCO |
-| id_tipo_parto | INT FK → Dim_TipoParto nullable | PARTO |
-| id_momento_obito_parto | INT FK → Dim_MomentoObitoParto nullable | OBITOPARTO |
-| id_tipo_gravidez | INT FK → Dim_TipoGravidez nullable | GRAVIDEZ |
-| id_semana_gestacao | INT FK → Dim_SemanaGestacao nullable | SEMAGESTAC |
+| id_faixa_etaria | INT FK → Dim_FaixaEtaria | IDADE |
+| id_raca_cor | INT FK → Dim_RacaCor | RACACOR |
+| id_local_ocorrencia | INT FK → Dim_LocalOcorrencia | LOCOCOR |
+| id_situacao_gestacional | INT FK → Dim_SituacaoGestacionalObito | TPMORTEOCO |
+| id_tipo_parto | INT FK → Dim_TipoParto | PARTO |
+| id_momento_obito_parto | INT FK → Dim_MomentoObitoParto | OBITOPARTO |
+| id_tipo_gravidez | INT FK → Dim_TipoGravidez | GRAVIDEZ |
+| id_semana_gestacao | INT FK → Dim_SemanaGestacao | SEMAGESTAC |
 | id_causa_basica | INT FK → Dim_CID **NOT NULL** | CAUSABAS |
 | id_causa_materna | INT FK → Dim_CID nullable | CAUSAMAT |
 | id_causa_basica_original | INT FK → Dim_CID nullable | CAUSABAS_O |
-| sexo | CHAR(1) nullable | SEXO (atributo direto: '1','2','0','9') |
-| recebeu_assistencia_medica nullable | BOOLEAN | ASSISTMED (1=sim) |
+| sexo | CHAR(1) nullable | SEXO normalizado: 'F' (F/2), 'M' (M/1), 'I' (I/0/9/outros). CHECK constraint: sexo IN ('F','M','I') |
+| recebeu_assistencia_medica | BOOLEAN | ASSISTMED (1=sim) |
 | quantidade_obitos | INT **measure** | COUNT(*) |
 
 ---
@@ -347,11 +354,12 @@ Grão: combinação única de dimensões (1 registro por combinação)
 **Dependências:** Fases 2, 3, 4, 5, 6 (todas as dimensões carregadas)
 
 11. **Criar `sus_etl/fact_table.py`**:
-    - Aplicar filtro: `(SEXO IN ('F','2') AND IDADE BETWEEN '410' AND '449') OR (SEXO IN ('M','1','I','0','9') AND TPMORTEOCO IN ('1','2','3','4','5'))`
-    - Para registros NÃO-femininos incluídos pela exceção, logar contagem como alerta de qualidade (outliers)
+    - **Normalizar SEXO:** mapear valor original do SIM → 'F'|'M'|'I' (F/2→F, M/1→M, I/0/9/demais→I)
+    - Aplicar filtro: `(SEXO = 'F' AND IDADE BETWEEN '410' AND '449') OR (SEXO IN ('M','I') AND TPMORTEOCO IN ('1','2','3','4','5'))`
+    - Para registros M ou I incluídos pela exceção, logar contagem como alerta de qualidade (outliers)
     - Resolver cada FK via lookup nas dimensões
     - Agrupar por combinação única de dimensões
-    - Inserir em Fact_MorteMaterna com quantidade_obitos = COUNT(*)`
+    - Inserir em Fact_MorteMaterna com quantidade_obitos = COUNT(*)
 
 ### Fase 8: Pipeline ETL Integrado
 **Dependências:** Fases 1-7
@@ -389,7 +397,7 @@ Grão: combinação única de dimensões (1 registro por combinação)
 ### Como referência:
 - `arquivos/CNES/cnes_estabelecimentos.csv` — Fonte de dados CNES
 - `arquivos/SIM/dados_*.csv` (2014-2023) — Fonte de dados SIM
-- `exploracoes/filtra_mortalidade_materna.py` — Lógica de filtro original (TPMORTEOCO). **Substituído** pelo novo critério: sexo feminino + idade 10-49 + exceção não-femininos (M/I) com TPMORTEOCO
+- `exploracoes/filtra_mortalidade_materna.py` — Lógica de filtro original (TPMORTEOCO). **Substituído** pelo novo critério: SEXO normalizado + idade 10-49 + exceção M/I com TPMORTEOCO
 - `sus_etl/database.py` — Conexão PostgreSQL + engine SQLAlchemy
 - `sus_etl/processing.py` — Padrão de carga staging (referência)
 
@@ -398,8 +406,8 @@ Grão: combinação única de dimensões (1 registro por combinação)
 ## Verificação
 
 1. Executar pipeline ETL completo do staging até star schema
-2. `SELECT COUNT(*) FROM Fact_MorteMaterna` deve bater com total de registros do filtro: `(SEXO IN ('F','2') AND IDADE BETWEEN '410' AND '449') OR (SEXO IN ('M','1','I','0','9') AND TPMORTEOCO IN ('1','2','3','4','5'))`
-3. **Validação de outlier:** Log deve reportar quantos registros NÃO-femininos (masculinos + ignorados) foram incluídos pela exceção (espera-se quantidade residual)
+2. `SELECT COUNT(*) FROM Fact_MorteMaterna` deve bater com total de registros do filtro: `(SEXO = 'F' AND IDADE BETWEEN '410' AND '449') OR (SEXO IN ('M','I') AND TPMORTEOCO IN ('1','2','3','4','5'))`
+3. **Validação de outlier:** Log deve reportar quantos registros M ou I foram incluídos pela exceção (espera-se quantidade residual)
 4. Nenhum FK na fato deve apontar para ID inexistente nas dimensões
 5. Colunas NOT NULL (id_tempo, id_municipio_ocorrencia, id_causa_basica) sem NULLs
 6. Ao menos 1 registro por ano de dado disponível
