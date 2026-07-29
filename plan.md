@@ -8,6 +8,8 @@
 
 | Decisão | Escolha |
 |---|---|
+| Filtro de mortes maternas | **Sexo feminino** (F/2) AND **Idade entre 10 e 49 anos** (IDADE entre "410" e "449", onde 4=unidade ano). **Exceção (outlier):** registros com Sexo NÃO-feminino (M/1/I/0/9) AND TPMORTEOCO ∈ {1,2,3,4,5} também incluídos (possíveis pessoas trans + casos com sexo ignorado) |
+| Sexo | Atributo **direto** na fato (`sexo CHAR(1)`) — valores originais '1','2','0','9'. Sem dimensão própria (cardinalidade baixa, sem valor analítico no domínio de mortalidade materna) |
 | Escolaridade | **ESC** (categorias antigas: Nenhuma, 1-3 anos, 4-7, 8-11, 12+) |
 | Estado civil | Atributo **direto** na fato (`estcivil INT`) |
 | Filhos | **Descartado** — não haverá Dim_FaixaFilhos |
@@ -140,7 +142,9 @@
 | idade_min | INT |
 | idade_max | INT |
 
-Faixas: 10-14, 15-19, 20-24, 25-29, 30-34, 35-39, 40-44, 45-49, 50+
+Faixas: 10-14, 15-19, 20-24, 25-29, 30-34, 35-39, 40-44, 45-49
+
+> Nota: A faixa "50+" existe na dimensão para completude, mas não receberá registros devido ao filtro de idade (10-49 anos).
 
 ### 6. Dim_RacaCor
 
@@ -234,6 +238,34 @@ Faixas: 0-21, 22-27, 28-31, 32-36, 37-41, 42+
 
 ---
 
+## Critérios de Filtro (Registros que entram na Fato)
+
+Os registros do SIM são filtrados para incluir apenas mortes potencialmente maternas, seguindo a regra:
+
+### Regra principal: Mulheres em idade fértil
+```
+SEXO IN ('F', '2')
+AND IDADE BETWEEN '410' AND '449'
+```
+
+> **Decodificação do IDADE:** campo de 3 dígitos: o 1º dígito é a unidade (`4` = ano) e os 2 dígitos seguintes são a quantidade. Logo, `"410"` = 10 anos e `"449"` = 49 anos.
+
+### Exceção (outlier): Homens ou sexo ignorado com marcador de mortalidade materna
+```
+SEXO IN ('M', '1', 'I', '0', '9')
+AND TPMORTEOCO IN ('1', '2', '3', '4', '5')
+```
+
+Registros masculinos ou com sexo ignorado que possuem `TPMORTEOCO` indicando circunstância gestacional são incluídos como possíveis casos de pessoas trans ou erros de preenchimento — uma verificação de qualidade dos dados.
+
+### Filtro final (SQL-like)
+```sql
+WHERE (SEXO IN ('F', '2') AND IDADE BETWEEN '410' AND '449')
+   OR (SEXO IN ('M', '1', 'I', '0', '9') AND TPMORTEOCO IN ('1', '2', '3', '4', '5'))
+```
+
+---
+
 ## Tabela Fato
 
 ### Fact_MorteMaterna
@@ -261,6 +293,7 @@ Grão: combinação única de dimensões (1 registro por combinação)
 | id_causa_materna | INT FK → Dim_CID nullable | CAUSAMAT |
 | id_causa_basica_original | INT FK → Dim_CID nullable | CAUSABAS_O |
 | estcivil | INT nullable | ESTCIV (atributo direto) |
+| sexo | CHAR(1) nullable | SEXO (atributo direto: '1','2','0','9') |
 | recebeu_assistencia_medica | BOOLEAN | ASSISTMED (1=sim) |
 | quantidade_obitos | INT **measure** | COUNT(*) |
 
@@ -327,10 +360,11 @@ Grão: combinação única de dimensões (1 registro por combinação)
 **Dependências:** Fases 2, 3, 4, 5, 6 (todas as dimensões carregadas)
 
 11. **Criar `sus_etl/fact_table.py`**:
-    - Ler registros SIM filtrados (apenas TPMORTEOCO ∈ {1,2,3,4,5})
+    - Aplicar filtro: `(SEXO IN ('F','2') AND IDADE BETWEEN '410' AND '449') OR (SEXO IN ('M','1','I','0','9') AND TPMORTEOCO IN ('1','2','3','4','5'))`
+    - Para registros NÃO-femininos incluídos pela exceção, logar contagem como alerta de qualidade (outliers)
     - Resolver cada FK via lookup nas dimensões
     - Agrupar por combinação única de dimensões
-    - Inserir em Fact_MorteMaterna com quantidade_obitos = COUNT(*)
+    - Inserir em Fact_MorteMaterna com quantidade_obitos = COUNT(*)`
 
 ### Fase 8: Pipeline ETL Integrado
 **Dependências:** Fases 1-7
@@ -368,7 +402,7 @@ Grão: combinação única de dimensões (1 registro por combinação)
 ### Como referência:
 - `arquivos/CNES/cnes_estabelecimentos.csv` — Fonte de dados CNES
 - `arquivos/SIM/dados_*.csv` (2014-2023) — Fonte de dados SIM
-- `exploracoes/filtra_mortalidade_materna.py` — Lógica de filtro TPMORTEOCO
+- `exploracoes/filtra_mortalidade_materna.py` — Lógica de filtro original (TPMORTEOCO). **Substituído** pelo novo critério: sexo feminino + idade 10-49 + exceção não-femininos (M/I) com TPMORTEOCO
 - `sus_etl/database.py` — Conexão PostgreSQL + engine SQLAlchemy
 - `sus_etl/processing.py` — Padrão de carga staging (referência)
 
@@ -377,8 +411,9 @@ Grão: combinação única de dimensões (1 registro por combinação)
 ## Verificação
 
 1. Executar pipeline ETL completo do staging até star schema
-2. `SELECT COUNT(*) FROM Fact_MorteMaterna` deve bater com total de registros filtrados (TPMORTEOCO ∈ {1,2,3,4,5})
-3. Nenhum FK na fato deve apontar para ID inexistente nas dimensões
-4. Colunas NOT NULL (id_tempo, id_municipio_ocorrencia, id_causa_basica) sem NULLs
-5. Ao menos 1 registro por ano de dado disponível
-6. Consultas analíticas de exemplo funcionam (ex: óbitos por ano × raça_cor × região)
+2. `SELECT COUNT(*) FROM Fact_MorteMaterna` deve bater com total de registros do filtro: `(SEXO IN ('F','2') AND IDADE BETWEEN '410' AND '449') OR (SEXO IN ('M','1','I','0','9') AND TPMORTEOCO IN ('1','2','3','4','5'))`
+3. **Validação de outlier:** Log deve reportar quantos registros NÃO-femininos (masculinos + ignorados) foram incluídos pela exceção (espera-se quantidade residual)
+4. Nenhum FK na fato deve apontar para ID inexistente nas dimensões
+5. Colunas NOT NULL (id_tempo, id_municipio_ocorrencia, id_causa_basica) sem NULLs
+6. Ao menos 1 registro por ano de dado disponível
+7. Consultas analíticas de exemplo funcionam (ex: óbitos por ano × raça_cor × região)
