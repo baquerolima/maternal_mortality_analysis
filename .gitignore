@@ -5,3 +5,4 @@ venv/
 modelo_dimensional/
 .env*
 .github/
+dados_2014.csv
