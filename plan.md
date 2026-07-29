@@ -10,8 +10,8 @@
 |---|---|
 | Filtro de mortes maternas | **Sexo feminino** (F/2) AND **Idade entre 10 e 49 anos** (IDADE entre "410" e "449", onde 4=unidade ano). **Exceção (outlier):** registros com Sexo NÃO-feminino (M/1/I/0/9) AND TPMORTEOCO ∈ {1,2,3,4,5} também incluídos (possíveis pessoas trans + casos com sexo ignorado) |
 | Sexo | Atributo **direto** na fato (`sexo CHAR(1)`) — valores originais '1','2','0','9'. Sem dimensão própria (cardinalidade baixa, sem valor analítico no domínio de mortalidade materna) |
-| Escolaridade | **ESC** (categorias antigas: Nenhuma, 1-3 anos, 4-7, 8-11, 12+) |
-| Estado civil | Atributo **direto** na fato (`estcivil INT`) |
+| Escolaridade | **Descartado** — não haverá Dim_Escolaridade |
+| Estado civil | **Descartado** — não haverá atributo direto estcivil |
 | Filhos | **Descartado** — não haverá Dim_FaixaFilhos |
 | CNES | **Sub-dimensões snowflake** para natureza org, gestão, hierarquia, esfera, tipo unidade, natureza jurídica |
 | Bairro | **Independente** — `Dim_Bairro` com FK direta da fato |
@@ -156,17 +156,7 @@ Faixas: 10-14, 15-19, 20-24, 25-29, 30-34, 35-39, 40-44, 45-49
 
 1-Branca, 2-Preta, 3-Amarela, 4-Parda, 5-Indígena
 
-### 7. Dim_Escolaridade (ESC)
-
-| Coluna | Tipo |
-|---|---|
-| id_escolaridade | SERIAL PK |
-| codigo | INT | Código ESC original |
-| descricao | VARCHAR(60) |
-
-Categorias ESC: 0-Sem escolaridade, 1-1 a 3 anos, 2-4 a 7 anos, 3-8 a 11 anos, 4-12 anos e mais, 9-Ignorado
-
-### 8. Dim_LocalOcorrencia (LOCOCOR)
+### 7. Dim_LocalOcorrencia (LOCOCOR)
 
 | Coluna | Tipo |
 |---|---|
@@ -176,7 +166,7 @@ Categorias ESC: 0-Sem escolaridade, 1-1 a 3 anos, 2-4 a 7 anos, 3-8 a 11 anos, 4
 
 1-Hospital, 2-Outros est. saúde, 3-Domicílio, 4-Via pública, 5-Outros, 6-Aldeia indígena, 9-Ignorado
 
-### 9. Dim_SituacaoGestacionalObito (TPMORTEOCO)
+### 8. Dim_SituacaoGestacionalObito (TPMORTEOCO)
 
 | Coluna | Tipo |
 |---|---|
@@ -186,7 +176,7 @@ Categorias ESC: 0-Sem escolaridade, 1-1 a 3 anos, 2-4 a 7 anos, 3-8 a 11 anos, 4
 
 1-Na gravidez, 2-No parto, 3-No abortamento, 4-Até 42 dias pós-parto, 5-43d a 1 ano pós-parto, 8-Não ocorreu nestes períodos, 9-Ignorado
 
-### 10. Dim_TipoParto (PARTO)
+### 9. Dim_TipoParto (PARTO)
 
 | Coluna | Tipo |
 |---|---|
@@ -196,7 +186,7 @@ Categorias ESC: 0-Sem escolaridade, 1-1 a 3 anos, 2-4 a 7 anos, 3-8 a 11 anos, 4
 
 1-Vaginal, 2-Cesáreo, 9-Ignorado
 
-### 11. Dim_MomentoObitoParto (OBITOPARTO)
+### 10. Dim_MomentoObitoParto (OBITOPARTO)
 
 | Coluna | Tipo |
 |---|---|
@@ -206,7 +196,7 @@ Categorias ESC: 0-Sem escolaridade, 1-1 a 3 anos, 2-4 a 7 anos, 3-8 a 11 anos, 4
 
 1-Antes, 2-Durante, 3-Depois, 9-Ignorado
 
-### 12. Dim_TipoGravidez (GRAVIDEZ)
+### 11. Dim_TipoGravidez (GRAVIDEZ)
 
 | Coluna | Tipo |
 |---|---|
@@ -216,7 +206,7 @@ Categorias ESC: 0-Sem escolaridade, 1-1 a 3 anos, 2-4 a 7 anos, 3-8 a 11 anos, 4
 
 1-Única, 2-Dupla, 3-Tripla e mais, 9-Ignorada
 
-### 13. Dim_SemanaGestacao (SEMAGESTAC)
+### 12. Dim_SemanaGestacao (SEMAGESTAC)
 
 | Coluna | Tipo |
 |---|---|
@@ -227,7 +217,7 @@ Categorias ESC: 0-Sem escolaridade, 1-1 a 3 anos, 2-4 a 7 anos, 3-8 a 11 anos, 4
 
 Faixas: 0-21, 22-27, 28-31, 32-36, 37-41, 42+
 
-### 14. Dim_CID (Role-Playing)
+### 13. Dim_CID (Role-Playing)
 
 | Coluna | Tipo |
 |---|---|
@@ -274,27 +264,25 @@ Grão: combinação única de dimensões (1 registro por combinação)
 
 | Coluna | Tipo | Origem |
 |---|---|---|
-| id_tempo | INT FK → Dim_Tempo | DTOBITO |
+| id_tempo **NOT NULL** | INT FK → Dim_Tempo | DTOBITO |
 | id_municipio_ocorrencia | INT FK → Dim_Municipio **NOT NULL** | CODMUNOCOR |
 | id_municipio_residencia | INT FK → Dim_Municipio nullable | CODMUNRES |
 | id_municipio_estabelecimento | INT FK → Dim_Municipio nullable | CO_IBGE (CNES) |
 | id_bairro_ocorrencia | INT FK → Dim_Bairro nullable | NO_BAIRRO (CNES) |
 | id_estabelecimento_saude | INT FK → Dim_EstabelecimentoSaude nullable | CODESTAB |
-| id_faixa_etaria | INT FK → Dim_FaixaEtaria | IDADE |
-| id_raca_cor | INT FK → Dim_RacaCor | RACACOR |
-| id_escolaridade | INT FK → Dim_Escolaridade | ESC |
-| id_local_ocorrencia | INT FK → Dim_LocalOcorrencia | LOCOCOR |
-| id_situacao_gestacional | INT FK → Dim_SituacaoGestacionalObito | TPMORTEOCO |
-| id_tipo_parto | INT FK → Dim_TipoParto | PARTO |
-| id_momento_obito_parto | INT FK → Dim_MomentoObitoParto | OBITOPARTO |
-| id_tipo_gravidez | INT FK → Dim_TipoGravidez | GRAVIDEZ |
-| id_semana_gestacao | INT FK → Dim_SemanaGestacao | SEMAGESTAC |
+| id_faixa_etaria | INT FK → Dim_FaixaEtaria nullable | IDADE |
+| id_raca_cor | INT FK → Dim_RacaCor nullable | RACACOR |
+| id_local_ocorrencia | INT FK → Dim_LocalOcorrencia nullable | LOCOCOR |
+| id_situacao_gestacional | INT FK → Dim_SituacaoGestacionalObito nullable | TPMORTEOCO |
+| id_tipo_parto | INT FK → Dim_TipoParto nullable | PARTO |
+| id_momento_obito_parto | INT FK → Dim_MomentoObitoParto nullable | OBITOPARTO |
+| id_tipo_gravidez | INT FK → Dim_TipoGravidez nullable | GRAVIDEZ |
+| id_semana_gestacao | INT FK → Dim_SemanaGestacao nullable | SEMAGESTAC |
 | id_causa_basica | INT FK → Dim_CID **NOT NULL** | CAUSABAS |
 | id_causa_materna | INT FK → Dim_CID nullable | CAUSAMAT |
 | id_causa_basica_original | INT FK → Dim_CID nullable | CAUSABAS_O |
-| estcivil | INT nullable | ESTCIV (atributo direto) |
 | sexo | CHAR(1) nullable | SEXO (atributo direto: '1','2','0','9') |
-| recebeu_assistencia_medica | BOOLEAN | ASSISTMED (1=sim) |
+| recebeu_assistencia_medica nullable | BOOLEAN | ASSISTMED (1=sim) |
 | quantidade_obitos | INT **measure** | COUNT(*) |
 
 ---
@@ -320,7 +308,6 @@ Grão: combinação única de dimensões (1 registro por combinação)
    - Dim_MomentoObitoParto (4 valores OBITOPARTO)
    - Dim_TipoGravidez (4 valores GRAVIDEZ)
    - Dim_SemanaGestacao (6 faixas)
-   - Dim_Escolaridade (categorias ESC)
    - Dim_NaturezaJuridica (categorias CNES)
 
 5. **Função `carregar_dimensoes_fixas()`** que insere via SQLAlchemy
