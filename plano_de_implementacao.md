@@ -8,10 +8,10 @@
 
 | Decisão | Escolha |
 |---|---|
-| Filtro de mortes maternas | (SEXO = 'F' AND IDADE BETWEEN '410' AND '449') OR (SEXO IN ('M','I') AND TPMORTEOCO ∈ {1,2,3,4,5}). SEXO normalizado no ETL: 'F' (F/2), 'M' (M/1), 'I' (I/0/9/outros) |
+| Filtro de mortes maternas | `IDADE BETWEEN '410' AND '449'` (10 a 49 anos), sem distinção de sexo. TPMORTEOCO 6 e 7 normalizados para 9 (Ignorado) |
 | Escolaridade | **Descartado** -- não haverá Dim_Escolaridade |
 | Estado civil | **Descartado** -- não haverá atributo direto `estcivil` |
-| Sexo | Atributo **direto** na fato (`sexo CHAR(1)`). Normalizado no ETL com CHECK constraint: sexo IN ('F','M','I'). Valores originais do SIM (1/2/F/M/I/0/9) são mapeados para 'F','M','I' |
+| Sexo | **Removido da fato.** Usado apenas no filtro do ETL (normalizado: '2'/'F'→F, '1'/'M'→M, '0'/'9'/outros→I). Não persiste na tabela final |
 | Filhos | **Descartado** — não haverá Dim_FaixaFilhos |
 | CNES | **Sub-dimensões snowflake** para natureza org, gestão, hierarquia, esfera, tipo unidade, natureza jurídica |
 | Bairro | **Independente** — `Dim_Bairro` com FK direta da fato |
@@ -154,7 +154,7 @@ Faixas: 10-14, 15-19, 20-24, 25-29, 30-34, 35-39, 40-44, 45-49
 | codigo | INT |
 | descricao | VARCHAR(20) |
 
-1-Branca, 2-Preta, 3-Amarela, 4-Parda, 5-Indígena
+1-Branca, 2-Preta, 3-Amarela, 4-Parda, 5-Indígena, 9-Ignorado
 
 ### 7. Dim_LocalOcorrencia (LOCOCOR)
 
@@ -175,6 +175,7 @@ Faixas: 10-14, 15-19, 20-24, 25-29, 30-34, 35-39, 40-44, 45-49
 | descricao | VARCHAR(60) |
 
 1-Na gravidez, 2-No parto, 3-No abortamento, 4-Até 42 dias pós-parto, 5-43d a 1 ano pós-parto, 8-Não ocorreu nestes períodos, 9-Ignorado
+> Nota: Valores 6 e 7 do SIM são normalizados para 9 (Ignorado) no ETL
 
 ### 9. Dim_TipoParto (PARTO)
 
@@ -230,35 +231,23 @@ Faixas: 0-21, 22-27, 28-31, 32-36, 37-41, 42+
 
 ## Critérios de Filtro (Registros que entram na Fato)
 
-Os registros do SIM são filtrados para incluir apenas mortes potencialmente maternas, seguindo a regra:
+Os registros do SIM são filtrados para incluir apenas mortes potencialmente maternas. O SEXO é normalizado no ETL ('2'/'F'→F, '1'/'M'→M, demais→I) e usado apenas como critério de filtro — não é armazenado na fato.
 
-#### Filtro de mortes maternas
+#### Filtro único (sem exceção separada)
 ```
-(SEXO = 'F' AND IDADE BETWEEN '410' AND '449')
-OR (SEXO IN ('M', 'I') AND TPMORTEOCO IN ('1','2','3','4','5'))
-```
-Onde SEXO foi normalizado no ETL: 'F' (F ou 2 no SIM), 'M' (M ou 1), 'I' (I, 0, 9 ou demais).
-
-### Regra principal: Mulheres em idade fértil
-```
-SEXO = 'F'
-AND IDADE BETWEEN '410' AND '449'
+(SEXO_NORMALIZADO = 'F' AND IDADE BETWEEN '410' AND '449')
+OR (TPMORTEOCO_NORMALIZADO IN ('1', '2', '3', '4', '5'))
 ```
 
 > **Decodificação do IDADE:** campo de 3 dígitos: o 1º dígito é a unidade (`4` = ano) e os 2 dígitos seguintes são a quantidade. Logo, `"410"` = 10 anos e `"449"` = 49 anos.
 
-### Exceção (outlier): Sexo M ou I com marcador de mortalidade materna
-```
-SEXO IN ('M', 'I')
-AND TPMORTEOCO IN ('1', '2', '3', '4', '5')
-```
-
-Registros de sexo masculino ou ignorado que possuem `TPMORTEOCO` indicando circunstância gestacional são incluídos como possíveis casos de pessoas trans ou erros de preenchimento — uma verificação de qualidade dos dados.
+### Nota sobre inclusão de outliers
+Registros com TPMORTEOCO indicando circunstância gestacional (1 a 5) são incluídos automaticamente, independentemente do SEXO. Isto captura os casos de sexo M ou I sem necessidade de tratamento especial. O SEXO não persiste na tabela fato.
 
 ### Filtro final (SQL-like)
 ```sql
-WHERE (SEXO = 'F' AND IDADE BETWEEN '410' AND '449')
-   OR (SEXO IN ('M', 'I') AND TPMORTEOCO IN ('1', '2', '3', '4', '5'))
+WHERE (SEXO_NORMALIZADO = 'F' AND IDADE BETWEEN '410' AND '449')
+   OR (TPMORTEOCO_NORMALIZADO IN ('1', '2', '3', '4', '5'))
 ```
 
 ---
@@ -288,7 +277,6 @@ Grão: combinação única de dimensões (1 registro por combinação)
 | id_causa_basica | INT FK → Dim_CID **NOT NULL** | CAUSABAS |
 | id_causa_materna | INT FK → Dim_CID nullable | CAUSAMAT |
 | id_causa_basica_original | INT FK → Dim_CID nullable | CAUSABAS_O |
-| sexo | CHAR(1) nullable | SEXO normalizado: 'F' (F/2), 'M' (M/1), 'I' (I/0/9/outros). CHECK constraint: sexo IN ('F','M','I') |
 | recebeu_assistencia_medica | BOOLEAN | ASSISTMED (1=sim) |
 | quantidade_obitos | INT **measure** | COUNT(*) |
 
@@ -308,7 +296,7 @@ Grão: combinação única de dimensões (1 registro por combinação)
 
 4. **Criar módulo `sus_etl/dimensoes_fixas.py`** com dicionários de:
    - Dim_Regiao (5 regiões)
-   - Dim_RacaCor (5 cores)
+   - Dim_RacaCor (6 cores, incluindo código 9-Ignorado)
    - Dim_LocalOcorrencia (7 valores LOCOCOR)
    - Dim_SituacaoGestacionalObito (7 valores TPMORTEOCO)
    - Dim_TipoParto (4 valores PARTO)
@@ -354,9 +342,9 @@ Grão: combinação única de dimensões (1 registro por combinação)
 **Dependências:** Fases 2, 3, 4, 5, 6 (todas as dimensões carregadas)
 
 11. **Criar `sus_etl/fact_table.py`**:
-    - **Normalizar SEXO:** mapear valor original do SIM → 'F'|'M'|'I' (F/2→F, M/1→M, I/0/9/demais→I)
-    - Aplicar filtro: `(SEXO = 'F' AND IDADE BETWEEN '410' AND '449') OR (SEXO IN ('M','I') AND TPMORTEOCO IN ('1','2','3','4','5'))`
-    - Para registros M ou I incluídos pela exceção, logar contagem como alerta de qualidade (outliers)
+    - **Normalizar SEXO internamente** (não persiste na fato): mapear valor original do SIM → 'F'|'M'|'I' (2/F→F, 1/M→M, 0/9/demais→I)
+    - **Normalizar TPMORTEOCO:** valores 6 e 7 → 9 (Ignorado)
+    - Aplicar filtro: `(SEXO_NORMALIZADO = 'F' AND IDADE BETWEEN '410' AND '449') OR (TPMORTEOCO_NORMALIZADO IN ('1','2','3','4','5'))`
     - Resolver cada FK via lookup nas dimensões
     - Agrupar por combinação única de dimensões
     - Inserir em Fact_MorteMaterna com quantidade_obitos = COUNT(*)
@@ -406,9 +394,8 @@ Grão: combinação única de dimensões (1 registro por combinação)
 ## Verificação
 
 1. Executar pipeline ETL completo do staging até star schema
-2. `SELECT COUNT(*) FROM Fact_MorteMaterna` deve bater com total de registros do filtro: `(SEXO = 'F' AND IDADE BETWEEN '410' AND '449') OR (SEXO IN ('M','I') AND TPMORTEOCO IN ('1','2','3','4','5'))`
-3. **Validação de outlier:** Log deve reportar quantos registros M ou I foram incluídos pela exceção (espera-se quantidade residual)
-4. Nenhum FK na fato deve apontar para ID inexistente nas dimensões
-5. Colunas NOT NULL (id_tempo, id_municipio_ocorrencia, id_causa_basica) sem NULLs
-6. Ao menos 1 registro por ano de dado disponível
-7. Consultas analíticas de exemplo funcionam (ex: óbitos por ano × raça_cor × região)
+2. `SELECT COUNT(*) FROM Fact_MorteMaterna` deve bater com total de registros do filtro: `SEXO_NORMALIZADO = 'F' AND IDADE BETWEEN '410' AND '449'`
+3. Nenhum FK na fato deve apontar para ID inexistente nas dimensões
+4. Colunas NOT NULL (id_tempo, id_municipio_ocorrencia, id_causa_basica) sem NULLs
+5. Ao menos 1 registro por ano de dado disponível
+6. Consultas analíticas de exemplo funcionam (ex: óbitos por ano × raça_cor × região)

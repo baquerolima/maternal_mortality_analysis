@@ -202,7 +202,7 @@ CREATE TABLE dimensional.dim_raca_cor (
     CONSTRAINT uq_dim_raca_cor_codigo UNIQUE (codigo)
 );
 
-COMMENT ON TABLE dimensional.dim_raca_cor IS '1-Branca, 2-Preta, 3-Amarela, 4-Parda, 5-Indígena';
+COMMENT ON TABLE dimensional.dim_raca_cor IS '1-Branca, 2-Preta, 3-Amarela, 4-Parda, 5-Indígena, 9-Ignorado';
 
 -- ============================================================================
 -- 8. Dim_LocalOcorrencia (LOCOCOR)
@@ -226,7 +226,7 @@ CREATE TABLE dimensional.dim_situacao_gestacional_obito (
     CONSTRAINT uq_dim_sit_gestacional_codigo UNIQUE (codigo)
 );
 
-COMMENT ON TABLE dimensional.dim_situacao_gestacional_obito IS '1-Na gravidez, 2-No parto, 3-No abortamento, 4-Até 42 dias pós-parto, 5-43d a 1 ano, 8-Não ocorreu, 9-Ignorado';
+COMMENT ON TABLE dimensional.dim_situacao_gestacional_obito IS '1-Na gravidez, 2-No parto, 3-No abortamento, 4-Até 42 dias pós-parto, 5-43d a 1 ano, 8-Não ocorreu, 9-Ignorado. ETL: 6 e 7 do SIM são normalizados para 9';
 
 -- ============================================================================
 -- 10. Dim_TipoParto (PARTO)
@@ -314,7 +314,6 @@ CREATE TABLE dimensional.fact_morte_materna (
     id_causa_basica              INTEGER NOT NULL REFERENCES dimensional.dim_cid(id_cid) ON DELETE RESTRICT,
     id_causa_materna             INTEGER REFERENCES dimensional.dim_cid(id_cid) ON DELETE RESTRICT,
     id_causa_basica_original     INTEGER REFERENCES dimensional.dim_cid(id_cid) ON DELETE RESTRICT,
-    sexo                         CHAR(1),
     recebeu_assistencia_medica   BOOLEAN,
     quantidade_obitos            INTEGER NOT NULL DEFAULT 1,
     -- Chave primária composta: grão = combinação única de dimensões
@@ -336,10 +335,8 @@ CREATE TABLE dimensional.fact_morte_materna (
         COALESCE(id_semana_gestacao, 0),
         COALESCE(id_causa_materna, 0),
         COALESCE(id_causa_basica_original, 0),
-        COALESCE(sexo, 'X'),
         COALESCE(recebeu_assistencia_medica::INTEGER, -1)::BOOLEAN
-    ),
-    CONSTRAINT chk_fact_sexo CHECK (sexo IN ('F', 'M', 'I'))
+    )
 );
 
 -- Índices para performance analítica
@@ -351,10 +348,8 @@ CREATE INDEX idx_fact_morte_causa_materna   ON dimensional.fact_morte_materna(id
 CREATE INDEX idx_fact_morte_faixa_etaria    ON dimensional.fact_morte_materna(id_faixa_etaria);
 CREATE INDEX idx_fact_morte_raca_cor        ON dimensional.fact_morte_materna(id_raca_cor);
 CREATE INDEX idx_fact_morte_estabelecimento ON dimensional.fact_morte_materna(id_estabelecimento_saude);
-CREATE INDEX idx_fact_morte_sexo            ON dimensional.fact_morte_materna(sexo);
 
 COMMENT ON TABLE dimensional.fact_morte_materna IS 'Fato de mortalidade materna — grão: combinação única de dimensões. measure: quantidade_obitos (COUNT)';
-COMMENT ON COLUMN dimensional.fact_morte_materna.sexo IS 'F=Feminino, M=Masculino, I=Ignorado. Normalizado no ETL.';
 COMMENT ON COLUMN dimensional.fact_morte_materna.quantidade_obitos IS 'Medida: contagem de óbitos para aquela combinação de dimensões';
 
 -- ============================================================================
