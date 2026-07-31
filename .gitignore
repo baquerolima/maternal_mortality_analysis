@@ -1,5 +1,6 @@
-arquivos/
-venv/
+arquivos/*
+.venv/*
+venv/*
 .ipynb_checkpoints/
 *.dmd
 modelo_dimensional/
