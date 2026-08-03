@@ -84,10 +84,6 @@ CO_AMBULATORIAL_SUS
     Identificador se a pessoa falecida recebeu assistencia medica. 1 – sim; 2 – não; 9 – ignorado
     Esse atributo compõem as circunstancias do óbito da pessoa falecida e dele deriva a dimensão recebeu_assist_medica.
 
-`CAUSAMAT`
-    CID da causa externa associada a uma causa materna.
-    Esse atributo compõem as circunstancias do óbito da pessoa falecida e dele deriva a dimensão causa_materna.
-
 `CAUSABAS`
     CIDs informados como causa básica do óbito. Representa a causa inicial geralmente.
     Esse atributo compõem as circunstancias do óbito da pessoa falecida e dele deriva a dimensão causa_basica.
@@ -110,8 +106,8 @@ CO_AMBULATORIAL_SUS
 - As 3 FKs apontam para a mesma `Dim_Municipio` — *role-playing dimension*
 
 ### Decisão: CID como Role-Playing Dimension
-- `Dim_CID` é reutilizada com papel triplo na fato: `id_causa_basica` (NOT NULL), `id_causa_materna` (nullable) e `id_causa_basica_original` (nullable) oriundo do atributo "CO_IBGE" do CNES.
-- As 3 FKs apontam para a mesma `Dim_CID` — *role-playing dimension*
+- `Dim_CID` é reutilizada com papel duplo na fato: `id_causa_basica` (NOT NULL) e `id_causa_basica_original` (nullable).
+- As 2 FKs apontam para a mesma `Dim_CID` — *role-playing dimension*
 
 ## Modelo Dimensional (Snowflake)
 
@@ -130,7 +126,7 @@ Pendente: Escrever as dimensões secundarias com os atributos do CNES que serão
 - `Dim_MomentoGravidez`: id_momento_gravidez (PK), codigo, descricao (Durante gravidez,No parto/aborto,Até 42 dias pós-parto,43d a 1 ano pós-parto,Não se aplica)
 - `Dim_TipoParto`: id_tipo_parto (PK), codigo, descricao (Vaginal,Cesáreo,Ignorado,Não se aplica)
 Pendente: Escrever as dimensões de circunstancias do obito que estão descritas acima e não estão elencadas aqui.
-Pendente: Escrever as dimensões `id_causa_basica`, `id_causa_materna` e `id_causa_basica_original` associadas à `DIM_CID`.
+Pendente: Escrever as dimensões `id_causa_basica` e `id_causa_basica_original` associadas à `DIM_CID`.
 
 ### Tabela Fato
 

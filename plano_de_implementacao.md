@@ -8,7 +8,7 @@
 
 | Decisão | Escolha |
 |---|---|
-| Filtro de mortes maternas | `IDADE BETWEEN '410' AND '449'` (10 a 49 anos), sem distinção de sexo. TPMORTEOCO 6 e 7 normalizados para 9 (Ignorado) |
+| Filtro de mortes maternas | `(SEXO_NORMALIZADO = 'F' AND IDADE BETWEEN '410' AND '449') OR (TPMORTEOCO_NORMALIZADO IN ('1','2','3','4','5') AND IDADE BETWEEN '408' AND '465')` (mulheres 10-49 anos OU circunstância gestacional 1-5 com 8-65 anos). TPMORTEOCO 6 e 7 normalizados para 9 (Ignorado) |
 | Escolaridade | **Descartado** -- não haverá Dim_Escolaridade |
 | Estado civil | **Descartado** -- não haverá atributo direto `estcivil` |
 | Sexo | **Removido da fato.** Usado apenas no filtro do ETL (normalizado: '2'/'F'→F, '1'/'M'→M, '0'/'9'/outros→I). Não persiste na tabela final |
@@ -16,7 +16,7 @@
 | CNES | **Sub-dimensões snowflake** para natureza org, gestão, hierarquia, esfera, tipo unidade, natureza jurídica |
 | Bairro | **Independente** — `Dim_Bairro` com FK direta da fato |
 | Granularidade da fato | Contagem agregada por combinação única de dimensões |
-| CID | Role-playing dimension (causa_basica, causa_materna, causa_basica_original) |
+| CID | Role-playing dimension (causa_basica, causa_basica_original) |
 | Município | Role-playing dimension (ocorrência, residência, estabelecimento) |
 
 ---
@@ -236,18 +236,18 @@ Os registros do SIM são filtrados para incluir apenas mortes potencialmente mat
 #### Filtro único (sem exceção separada)
 ```
 (SEXO_NORMALIZADO = 'F' AND IDADE BETWEEN '410' AND '449')
-OR (TPMORTEOCO_NORMALIZADO IN ('1', '2', '3', '4', '5'))
+OR (TPMORTEOCO_NORMALIZADO IN ('1', '2', '3', '4', '5') AND IDADE BETWEEN '408' AND '465')
 ```
 
-> **Decodificação do IDADE:** campo de 3 dígitos: o 1º dígito é a unidade (`4` = ano) e os 2 dígitos seguintes são a quantidade. Logo, `"410"` = 10 anos e `"449"` = 49 anos.
+> **Decodificação do IDADE:** campo de 3 dígitos: o 1º dígito é a unidade (`4` = ano) e os 2 dígitos seguintes são a quantidade. Logo, `"410"` = 10 anos, `"449"` = 49 anos, `"408"` = 8 anos e `"465"` = 65 anos.
 
 ### Nota sobre inclusão de outliers
-Registros com TPMORTEOCO indicando circunstância gestacional (1 a 5) são incluídos automaticamente, independentemente do SEXO. Isto captura os casos de sexo M ou I sem necessidade de tratamento especial. O SEXO não persiste na tabela fato.
+Registros com TPMORTEOCO indicando circunstância gestacional (1 a 5) são incluídos independentemente do SEXO — capturando os casos de sexo M ou I — **desde que a idade esteja entre 8 e 65 anos** (`IDADE BETWEEN '408' AND '465'`). O SEXO não persiste na tabela fato.
 
 ### Filtro final (SQL-like)
 ```sql
 WHERE (SEXO_NORMALIZADO = 'F' AND IDADE BETWEEN '410' AND '449')
-   OR (TPMORTEOCO_NORMALIZADO IN ('1', '2', '3', '4', '5'))
+   OR (TPMORTEOCO_NORMALIZADO IN ('1', '2', '3', '4', '5') AND IDADE BETWEEN '408' AND '465')
 ```
 
 ---
@@ -275,7 +275,6 @@ Grão: combinação única de dimensões (1 registro por combinação)
 | id_tipo_gravidez | INT FK → Dim_TipoGravidez | GRAVIDEZ |
 | id_semana_gestacao | INT FK → Dim_SemanaGestacao | SEMAGESTAC |
 | id_causa_basica | INT FK → Dim_CID **NOT NULL** | CAUSABAS |
-| id_causa_materna | INT FK → Dim_CID nullable | CAUSAMAT |
 | id_causa_basica_original | INT FK → Dim_CID nullable | CAUSABAS_O |
 | recebeu_assistencia_medica | BOOLEAN | ASSISTMED (1=sim) |
 | quantidade_obitos | INT **measure** | COUNT(*) |
@@ -334,7 +333,7 @@ Grão: combinação única de dimensões (1 registro por combinação)
 **Dependências:** Fase 1
 
 10. **Criar `sus_etl/dimensao_cid.py`**:
-    - Extrair CIDs únicos de CAUSABAS, CAUSAMAT, CAUSABAS_O
+    - Extrair CIDs únicos de CAUSABAS, CAUSABAS_O
     - Buscar descrição e capítulo (pode ser via arquivo auxiliar CID-10)
     - Carregar Dim_CID
 
@@ -344,7 +343,7 @@ Grão: combinação única de dimensões (1 registro por combinação)
 11. **Criar `sus_etl/fact_table.py`**:
     - **Normalizar SEXO internamente** (não persiste na fato): mapear valor original do SIM → 'F'|'M'|'I' (2/F→F, 1/M→M, 0/9/demais→I)
     - **Normalizar TPMORTEOCO:** valores 6 e 7 → 9 (Ignorado)
-    - Aplicar filtro: `(SEXO_NORMALIZADO = 'F' AND IDADE BETWEEN '410' AND '449') OR (TPMORTEOCO_NORMALIZADO IN ('1','2','3','4','5'))`
+    - Aplicar filtro: `(SEXO_NORMALIZADO = 'F' AND IDADE BETWEEN '410' AND '449') OR (TPMORTEOCO_NORMALIZADO IN ('1','2','3','4','5') AND IDADE BETWEEN '408' AND '465')`
     - Resolver cada FK via lookup nas dimensões
     - Agrupar por combinação única de dimensões
     - Inserir em Fact_MorteMaterna com quantidade_obitos = COUNT(*)
@@ -385,7 +384,7 @@ Grão: combinação única de dimensões (1 registro por combinação)
 ### Como referência:
 - `arquivos/CNES/cnes_estabelecimentos.csv` — Fonte de dados CNES
 - `arquivos/SIM/dados_*.csv` (2014-2023) — Fonte de dados SIM
-- `exploracoes/filtra_mortalidade_materna.py` — Lógica de filtro original (TPMORTEOCO). **Substituído** pelo novo critério: SEXO normalizado + idade 10-49 + exceção M/I com TPMORTEOCO
+- `exploracoes/filtra_mortalidade_materna.py` — Lógica de filtro original (TPMORTEOCO). **Substituído** pelo novo critério: SEXO normalizado + idade 10-49 + exceção M/I com TPMORTEOCO e idade 8-65
 - `sus_etl/database.py` — Conexão PostgreSQL + engine SQLAlchemy
 - `sus_etl/processing.py` — Padrão de carga staging (referência)
 
@@ -394,7 +393,7 @@ Grão: combinação única de dimensões (1 registro por combinação)
 ## Verificação
 
 1. Executar pipeline ETL completo do staging até star schema
-2. `SELECT COUNT(*) FROM Fact_MorteMaterna` deve bater com total de registros do filtro: `SEXO_NORMALIZADO = 'F' AND IDADE BETWEEN '410' AND '449'`
+2. `SELECT COUNT(*) FROM Fact_MorteMaterna` deve bater com total de registros do filtro: `(SEXO_NORMALIZADO = 'F' AND IDADE BETWEEN '410' AND '449') OR (TPMORTEOCO_NORMALIZADO IN ('1','2','3','4','5') AND IDADE BETWEEN '408' AND '465')`
 3. Nenhum FK na fato deve apontar para ID inexistente nas dimensões
 4. Colunas NOT NULL (id_tempo, id_municipio_ocorrencia, id_causa_basica) sem NULLs
 5. Ao menos 1 registro por ano de dado disponível
