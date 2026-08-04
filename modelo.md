@@ -59,22 +59,6 @@ CO_AMBULATORIAL_SUS
     Desse atributo deriva a dimensão municipio_ocorrencia.
 
 ## Circunstâncias do óbito
-`SEMAGESTAC`
-    Numero de semanas de gestacao com dois dígitos. 9 representa "ignorado"
-    Esse atributo compõem as circunstancias do óbito da pessoa falecida e dele deriva a dimensão semanas_gestacao* que se organiza em faixas de semanas: 0 a 21 semanas; 22 a 27; 28 a 31; 32 a 36; 37 a 41; mais de 42 semanas.
-
-`GRAVIDEZ`
-    Tipo de Gravidez: 1 – única; 2 – dupla; 3 – tripla e mais; 9 – ignorada
-    Esse atributo compõem as circunstancias do óbito da pessoa falecida e dele deriva a dimensão tipo_gravidez.    
-
-`PARTO`
-    Tipo de Parto: 1 – vaginal; 2 – cesáreo; 9 – ignorado
-    Esse atributo compõem as circunstancias do óbito da pessoa falecida e dele deriva a dimensão tipo_parto.    
-
-`OBITOPARTO`
-    Momento do óbito em relação ao parto: 1 - antes; 2– durante; 3–depois; 9– Ignorado
-    Esse atributo compõem as circunstancias do óbito da pessoa falecida e dele deriva a dimensão momento_obito_parto.    
-
 `TPMORTEOCO`
     Situacao gestacional em que ocorreu o obito.
     1: na gravidez; 2: no parto; 3: no abortamento; 4: até 42 dias após o término do parto; 5: de 43 dias a 1 ano após o término da gestação; 8: não ocorreu nestes períodos; 9: ignorado.
@@ -124,14 +108,13 @@ Pendente: Escrever as dimensões secundarias com os atributos do CNES que serão
 - `Dim_FaixaEtaria`: id_faixa_etaria (PK), faixa ("10-14","15-19",...,"45-49"), idade_min, idade_max
 - `Dim_RacaCor`: id_raca_cor (PK), codigo (1-5), descricao (Branca,Preta,Amarela,Parda,Indígena)
 - `Dim_MomentoGravidez`: id_momento_gravidez (PK), codigo, descricao (Durante gravidez,No parto/aborto,Até 42 dias pós-parto,43d a 1 ano pós-parto,Não se aplica)
-- `Dim_TipoParto`: id_tipo_parto (PK), codigo, descricao (Vaginal,Cesáreo,Ignorado,Não se aplica)
 Pendente: Escrever as dimensões de circunstancias do obito que estão descritas acima e não estão elencadas aqui.
 Pendente: Escrever as dimensões `id_causa_basica` e `id_causa_basica_original` associadas à `DIM_CID`.
 
 ### Tabela Fato
 
 **1. Fact_MorteMaterna** — grão: combinação única de dimensões
-Colunas: id_tempo (FK), id_municipio_ocorrencia (FK, NOT NULL), id_municipio_residencia (FK, nullable), id_bairro_ocorrencia (FK, nullable → Dim_Bairro), id_faixa_etaria (FK), id_raca_cor (FK), id_escolaridade (FK), id_estado_civil (FK), id_local_ocorrencia (FK), id_estabelecimento_saude (FK), id_momento_gravidez (FK), id_tipo_parto (FK), id_faixa_filhos (FK), id_cid_basico (FK), durante_parto (bool), durante_puerperio (bool), recebeu_assistencia_medica (bool), **quantidade_obitos** (INT, measure)
+Colunas: id_tempo (FK), id_municipio_ocorrencia (FK, NOT NULL), id_municipio_residencia (FK, nullable), id_bairro_ocorrencia (FK, nullable → Dim_Bairro), id_faixa_etaria (FK), id_raca_cor (FK), id_escolaridade (FK), id_estado_civil (FK), id_local_ocorrencia (FK), id_estabelecimento_saude (FK), id_momento_gravidez (FK), id_faixa_filhos (FK), id_cid_basico (FK), durante_parto (bool), durante_puerperio (bool), recebeu_assistencia_medica (bool), **quantidade_obitos** (INT, measure)
 Pendente: incluir as novas dimensões.
 
 

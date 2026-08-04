@@ -16,6 +16,7 @@
 | CNES | **Sub-dimensões snowflake** para natureza org, gestão, hierarquia, esfera, tipo unidade, natureza jurídica |
 | Bairro | **Independente** — `Dim_Bairro` com FK direta da fato |
 | Granularidade da fato | Contagem agregada por combinação única de dimensões |
+| Gestação/Parto | **Removido** — `SEMAGESTAC`, `GRAVIDEZ`, `PARTO` e `OBITOPARTO`. Os registros com esses dados referem-se a investigações de mortes neonatais e fetais |
 | CID | Role-playing dimension (causa_basica, causa_basica_original) |
 | Município | Role-playing dimension (ocorrência, residência, estabelecimento) |
 
@@ -177,48 +178,7 @@ Faixas: 10-14, 15-19, 20-24, 25-29, 30-34, 35-39, 40-44, 45-49
 1-Na gravidez, 2-No parto, 3-No abortamento, 4-Até 42 dias pós-parto, 5-43d a 1 ano pós-parto, 8-Não ocorreu nestes períodos, 9-Ignorado
 > Nota: Valores 6 e 7 do SIM são normalizados para 9 (Ignorado) no ETL
 
-### 9. Dim_TipoParto (PARTO)
-
-| Coluna | Tipo |
-|---|---|
-| id_tipo_parto | SERIAL PK |
-| codigo | INT |
-| descricao | VARCHAR(20) |
-
-1-Vaginal, 2-Cesáreo, 9-Ignorado
-
-### 10. Dim_MomentoObitoParto (OBITOPARTO)
-
-| Coluna | Tipo |
-|---|---|
-| id_momento_obito_parto | SERIAL PK |
-| codigo | INT |
-| descricao | VARCHAR(20) |
-
-1-Antes, 2-Durante, 3-Depois, 9-Ignorado
-
-### 11. Dim_TipoGravidez (GRAVIDEZ)
-
-| Coluna | Tipo |
-|---|---|
-| id_tipo_gravidez | SERIAL PK |
-| codigo | INT |
-| descricao | VARCHAR(20) |
-
-1-Única, 2-Dupla, 3-Tripla e mais, 9-Ignorada
-
-### 12. Dim_SemanaGestacao (SEMAGESTAC)
-
-| Coluna | Tipo |
-|---|---|
-| id_semana_gestacao | SERIAL PK |
-| faixa | VARCHAR(20) |
-| semanas_min | INT |
-| semanas_max | INT |
-
-Faixas: 0-21, 22-27, 28-31, 32-36, 37-41, 42+
-
-### 13. Dim_CID (Role-Playing)
+### 9. Dim_CID (Role-Playing)
 
 | Coluna | Tipo |
 |---|---|
@@ -270,10 +230,6 @@ Grão: combinação única de dimensões (1 registro por combinação)
 | id_raca_cor | INT FK → Dim_RacaCor | RACACOR |
 | id_local_ocorrencia | INT FK → Dim_LocalOcorrencia | LOCOCOR |
 | id_situacao_gestacional | INT FK → Dim_SituacaoGestacionalObito | TPMORTEOCO |
-| id_tipo_parto | INT FK → Dim_TipoParto | PARTO |
-| id_momento_obito_parto | INT FK → Dim_MomentoObitoParto | OBITOPARTO |
-| id_tipo_gravidez | INT FK → Dim_TipoGravidez | GRAVIDEZ |
-| id_semana_gestacao | INT FK → Dim_SemanaGestacao | SEMAGESTAC |
 | id_causa_basica | INT FK → Dim_CID **NOT NULL** | CAUSABAS |
 | id_causa_basica_original | INT FK → Dim_CID nullable | CAUSABAS_O |
 | recebeu_assistencia_medica | BOOLEAN | ASSISTMED (1=sim) |
@@ -286,7 +242,7 @@ Grão: combinação única de dimensões (1 registro por combinação)
 ### Fase 1: Modelagem SQL e criação das tabelas
 **Dependências:** Nenhuma (paralelizável com Fase 2)
 
-1. **Criar script SQL de DDL** (`sus_etl/schemas/star_schema.sql`) com todas as 20 tabelas (14 dimensões + sub-dimensões CNES + fato)
+1. **Criar script SQL de DDL** (`sus_etl/schemas/star_schema.sql`) com todas as 19 tabelas (10 dimensões + 6 sub-dimensões CNES + Dim_Bairro + fato + metadados de carga)
 2. **Incluir CONSTRAINTS**, FKs, índices, chaves únicas
 3. **Adicionar tabela de metadados de dim_carga** (tracking de quando cada dimensão foi populada)
 
@@ -298,10 +254,6 @@ Grão: combinação única de dimensões (1 registro por combinação)
    - Dim_RacaCor (6 cores, incluindo código 9-Ignorado)
    - Dim_LocalOcorrencia (7 valores LOCOCOR)
    - Dim_SituacaoGestacionalObito (7 valores TPMORTEOCO)
-   - Dim_TipoParto (4 valores PARTO)
-   - Dim_MomentoObitoParto (4 valores OBITOPARTO)
-   - Dim_TipoGravidez (4 valores GRAVIDEZ)
-   - Dim_SemanaGestacao (6 faixas)
    - Dim_NaturezaJuridica (categorias CNES)
 
 5. **Função `carregar_dimensoes_fixas()`** que insere via SQLAlchemy
@@ -311,11 +263,7 @@ Grão: combinação única de dimensões (1 registro por combinação)
 
 6. **Extrair UF + região** de tabela auxiliar de municípios brasileiros
 7. **Criar `sus_etl/dimensoes_geograficas.py`**:
-   - Extrair municípios únicos de SIM (CODMUNOCOR, CODMUNRES) + CNES (CO_IBGE)
-   - Carregar Dim_UF e Dim_Municipio
-
-### Fase 4: Dimensão Estabelecimentos de Saúde
-**Dependências:** Fase 1, Fase 2 (sub-dimensões CNES)
+   - endências:** Fase 1, Fase 2 (sub-dimensões CNES)
 
 8. **Criar `sus_etl/dimensoes_cnes.py`**:
    - Carregar sub-dimensões CNES (NaturezaOrganizacao, TipoGestao, NivelHierarquia, EsferaAdministrativa, TipoUnidade) a partir dos dados do CNES
