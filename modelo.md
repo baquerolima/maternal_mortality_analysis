@@ -8,16 +8,16 @@
 `IDADE`
     Idade possui dois subcampos. Primeiro digito indica a unidade da idade (se 1 = minuto, se 2 = hora, se 3 = mês, se 4 = ano, se = 5 idade maior que 100 anos).
     Segundo subcampo indica a quantidade de unidades do campo 1. 
-    Esse atributo compõem a identificação da pessoa falecida e dele deriva a dimensão faixa_etaria.
+    Esse atributo compõem a identificação da mulher e dele deriva a dimensão faixa_etaria.
 
 `SEXO`
     Masculino = M,1 ; Feminino = F,2 ; Ignorado = I, 0, 9
     Esse campo serve para verificar se há registros de pessoas trans com óbitos maternos. 
-    Esse atributo compõem a identificação da pessoa falecida e dele deriva a dimensão sexo.
+    Esse atributo compõem a identificação da mulher e dele deriva a dimensão sexo.
 
 `RACACOR`
     1 – Branca; 2 – Preta; 3 – Amarela; 4 – Parda; 5 – Indígena
-    Esse atributo compõem a identificação da pessoa falecida e dele deriva a dimensão raça.
+    Esse atributo compõem a identificação da mulher e dele deriva a dimensão raça.
 
 ## Estabelecimento de Saúde
 `LOCOCOR`
@@ -61,20 +61,51 @@ CO_AMBULATORIAL_SUS
 ## Circunstâncias do óbito
 `TPMORTEOCO`
     Situacao gestacional em que ocorreu o obito.
-    1: na gravidez; 2: no parto; 3: no abortamento; 4: até 42 dias após o término do parto; 5: de 43 dias a 1 ano após o término da gestação; 8: não ocorreu nestes períodos; 9: ignorado.
-    Esse atributo compõem as circunstancias do óbito da pessoa falecida e dele deriva a dimensão situacao_gestacional_obito.
+    Códigos >> 1: na gravidez; 2: no parto; 3: no abortamento; 4: até 42 dias após o término do parto; 5: de 43 dias a 1 ano após o término da gestação; 8: não ocorreu nestes períodos; 9: ignorado.
+    Esse atributo compõem as circunstancias do óbito da mulher e dele deriva a dimensão situacao_gestacional_obito.
 
 `ASSISTMED`
-    Identificador se a pessoa falecida recebeu assistencia medica. 1 – sim; 2 – não; 9 – ignorado
-    Esse atributo compõem as circunstancias do óbito da pessoa falecida e dele deriva a dimensão recebeu_assist_medica.
+    Identificador se a mulher recebeu assistencia medica. Códigos >> 1 – sim; 2 – não; 9 – ignorado
+    Esse atributo compõem as circunstancias do óbito da mulher e dele deriva a dimensão recebeu_assist_medica.
 
 `CAUSABAS`
     CIDs informados como causa básica do óbito. Representa a causa inicial geralmente.
-    Esse atributo compõem as circunstancias do óbito da pessoa falecida e dele deriva a dimensão causa_basica.
+    Esse atributo compõem as circunstancias do óbito da mulher e dele deriva a dimensão causa_basica.
 
 `CAUSABAS_O`
     Causa básica original do óbito, informado antes da resseleção.
-    Esse atributo compõem as circunstancias do óbito da pessoa falecida e dele deriva a dimensao causa_basica_anterior.
+    Esse atributo compõem as circunstancias do óbito da mulher e dele deriva a dimensao causa_basica_anterior.
+
+## Investigação dos óbitos
+`DTINVESTIG`
+    Data da Investigação.
+
+`FONTEINV`
+    Fonte de Investigação. Códigos >> 1: Comitê de Morte Materna e/ou Infantil; 2: Visita domiciliar / Entrevista família; 3: Estabelecimento de Saúde / Prontuário; 4: Relacionado com outros bancos de dados; 5: SVO; 6: IML; 7: Outra fonte; 8: Múltiplas fontes; 9: Ignorado.
+
+`DTCONINV`
+    Data da conclusão da investigação.
+
+`NUDIASOBCO`
+    Diferença entre a data óbito e a data conclusão da investigação, em dias.
+
+`TPNIVELINV`
+    Tipo de nível investigador. Códigos >> E: Estadual; R: Regional; M: Municipal
+
+`MORTEPARTO`
+    Momento do óbito em relação ao parto após investigação. Códigos >> 1: Antes; 2: Durante; 3: Após; 9: Ignorado.
+
+`OBITOGRAV`
+    Óbito na gravidez. Códigos >> 1: sim; 2: não; 9: ignorado.
+
+`OBITOPUERP`
+    Óbito no puerpério. Códigos >> 1: Até 42 dias após o parto; 2: De 43 dias a 1 ano após o parto; 3: Não; 9: Ignorado.
+
+`TPOBITOCOR`
+    Códigos >> 1: Durante a gestação; 2: Durante o abortamento; 3: Após o abortamento; 4: No parto ou até 1 hora após o parto; 5: No puerpério até 42 dias após o parto; 6: Entre 43 dias e até 1 ano após o parto; 7: A investigação não identificou o momento do óbito; 8: Mais de um ano após o parto; 9: O óbito não ocorreu nas circunstancias anteriores; Nulo/Em Branco: Não investigado
+
+`TPRESGINFO`
+    Informa se a investigação permitiu o resgate de alguma causa de óbito não informado, ou a correção de alguma antes informada. Códigos >> 01: Não acrescentou nem corrigiu informação; 02: Sim, permitiu o resgate de novas informações; 03: Sim, permitiu a correção de alguma das causas informadas originalmente.
 
 
 # Modelo Dimensional para Análise de Mortalidade Materna
