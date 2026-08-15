@@ -18,38 +18,6 @@
     1 – Branca; 2 – Preta; 3 – Amarela; 4 – Parda; 5 – Indígena; 9 – Ignorado
     Esse atributo compõe a identificação da mulher e dele deriva a dimensão raça.
 
-## Estabelecimento de Saúde
-`LOCOCOR`
-    Local em que ocorreu o óbito. 1 – hospital; 2 – outros estabelecimentos de saúde; 3 – domicílio; 4 – via pública; 5 – outros; 6 - aldeia indígena; 9 – ignorado. 
-    Esse atributo compõe a dimensão `Dim_LocalOcorrencia`.
-
-`CODESTAB`
-    Codigo CNES do Estabelecimento de Saúde em que ocorreu o óbito. 
-    Esse atributo compõem a dimensão estabelecimento_de_saúde.
-
-Essa dimensão estabelecimento_de_saúde terá uma hierarquia "snowflake" com os dados dos estabelecimentos de saúde que vamos pegar na base do CNES - Cadastro Nacional dos Estabelecimentos de Saúde. A granularidade mais baixa refere-se aos codigos dos estabelecimentos; o local do óbito (`LOCOCOR`) fica na dimensão `Dim_LocalOcorrencia` e os demais dados oriundos do CNES - ver lista de campos abaixo.
-
-```
-Campos do CNES: 
-CO_CNES - equivalente a CODESTAB no SIM - essa é a chave de ligação entre os dados
-CO_IBGE
-CO_NATUREZA_ORGANIZACAO
-TP_GESTAO
-CO_NIVEL_HIERARQUIA
-CO_ESFERA_ADMINISTRATIVA
-CO_ATIVIDADE
-TP_UNIDADE
-NO_BAIRRO
-CO_NATUREZA_JUR
-ST_CENTRO_OBSTETRICO
-ST_CENTRO_NEONATAL
-ST_ATEND_HOSPITALAR
-ST_SERVICO_APOIO
-ST_ATEND_AMBULATORIAL
-CO_MOTIVO_DESAB
-CO_AMBULATORIAL_SUS
-```
-
 ## Municipio
 `CODMUNRES`
     Codigo do municipio com até 7 dígitos, porém maioria dos registros possui 6 dígitos. 
@@ -77,6 +45,10 @@ CO_AMBULATORIAL_SUS
     Causa básica original do óbito, informado antes da resseleção.
     Esse atributo compõe as circunstancias do óbito da mulher e dele deriva a `Dim_CID` (papel `id_causa_original` na tabela-fato, nullable).
 
+`LINHAA`, `LINHAB`, `LINHAC`, `LINHAD`, `LINHAII`
+    CIDs das demais linhas do atestado de óbito (causas antecedentes, consequenciais e Parte II). No arquivo do SIM os valores vêm prefixados com `*` (ex: `*R570`, `*I319`, `*X999`) e vazios quando não preenchidos.
+    Não geram dimensões. Derivam o booleano `possui_cid_obstetrico_secundario` na tabela-fato: `True` se **qualquer um** dos cinco contiver um CID obstétrico (Capítulo XV da CID-10, códigos `O00`–`O99` — código iniciado por `O` após o prefixo `*`).
+
 ## Investigação dos óbitos
 `NUDIASOBCO`
     Diferença entre a data óbito e a data conclusão da investigação, em dias.
@@ -90,6 +62,30 @@ CO_AMBULATORIAL_SUS
 
 `TPRESGINFO`
     Informa se a investigação permitiu o resgate de alguma causa de óbito não informado, ou a correção de alguma antes informada. Códigos >> 01: Não acrescentou nem corrigiu informação; 02: Sim, permitiu o resgate de novas informações; 03: Sim, permitiu a correção de alguma das causas informadas originalmente.
+
+## Estabelecimento de Saúde
+`LOCOCOR`
+    Local em que ocorreu o óbito. 1 – hospital; 2 – outros estabelecimentos de saúde; 3 – domicílio; 4 – via pública; 5 – outros; 6 - aldeia indígena; 9 – ignorado. 
+    Esse atributo compõe a dimensão `Dim_LocalOcorrencia`.
+
+`CODESTAB`
+    Codigo CNES do Estabelecimento de Saúde em que ocorreu o óbito. 
+    Esse atributo compõem a dimensão estabelecimento_de_saúde.
+
+Essa dimensão estabelecimento_de_saúde terá uma hierarquia "snowflake" com os dados dos estabelecimentos de saúde que vamos pegar na base do CNES - Cadastro Nacional dos Estabelecimentos de Saúde. A granularidade mais baixa refere-se aos codigos dos estabelecimentos; o local do óbito (`LOCOCOR`) fica na dimensão `Dim_LocalOcorrencia` e os demais dados oriundos do CNES - ver lista de campos abaixo.
+
+```
+Campos do CNES: 
+CO_CNES - equivalente a CODESTAB no SIM - essa é a chave de ligação entre os dados
+NO_FANTASIA
+CO_IBGE
+TP_GESTAO
+CO_ESFERA_ADMINISTRATIVA
+TP_UNIDADE
+NO_BAIRRO
+CO_NATUREZA_JUR
+CO_AMBULATORIAL_SUS
+```
 
 ## Decisões de EDA — Colunas de Investigação (validado em `exploracoes/analisa_variaveis_dim.ipynb`)
 
@@ -124,6 +120,10 @@ CO_AMBULATORIAL_SUS
 ### Decisão: CID como Role-Playing Dimension
 - `Dim_CID` é reutilizada com papel duplo na fato: `id_causa_basica` (NOT NULL, derivada de `CAUSABAS`) e `id_causa_original` (nullable, derivada de `CAUSABAS_O`).
 - As 2 FKs apontam para a mesma `Dim_CID` — *role-playing dimension*
+
+### Decisão: CID obstétrico secundário (LINHAA–LINHAII)
+- `LINHAA`, `LINHAB`, `LINHAC`, `LINHAD` e `LINHAII` não geram dimensão; derivam apenas o booleano `possui_cid_obstetrico_secundario` ("PossuiCidObstetricoSecundario") na fato.
+- Regra: `True` se **qualquer um** dos cinco campos contiver CID do Capítulo XV da CID-10 (`O00`–`O99`, i.e., código iniciado por `O` após o prefixo `*` presente no arquivo do SIM); `False` caso contrário.
 
 ### Decisão: Momento da Gravidez como Role-Playing Dimension
 - `Dim_MomentoGravidez` é reutilizada com papel duplo na fato: `id_momento_gravidez` (derivada de `TPMORTEOCO`) e `id_momento_gravidez_pos_investigacao` (nullable, derivada de `TPOBITOCOR`).
@@ -170,6 +170,7 @@ Colunas:
     id_causa_original (FK, nullable, de CAUSABAS_O), 
     recebeu_assistencia_medica (bool, de ASSISTMED normalizado), 
     atendimento_ambulatorial_sus (bool, de CO_AMBULATORIAL_SUS normalizado: "SIM" → True), 
+    possui_cid_obstetrico_secundario (bool, de LINHAA/LINHAB/LINHAC/LINHAD/LINHAII: True se algum contém CID obstétrico O00–O99), 
     id_nivel_investigador (FK, nullable → Dim_NivelInvestigador), 
     id_resgate_info (FK, nullable → Dim_ResgateInfo), 
     id_faixa_dias_investigacao (FK, nullable → Dim_FaixaDiasInvestigacao), 
