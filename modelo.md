@@ -2,7 +2,7 @@
 
 ## Tempo
 `DTOBITO`
-    Data do óbito no formato DDMMAAAA. Desse atributo deriva toda a dimensão tempo.
+    Data do óbito no formato DDMMAAAA. Desse atributo deriva apenas o **ano** do óbito — a análise será feita somente por ano, sem granularidade de dia/mês. A dimensão tempo é simplificada para conter apenas o ano.
 
 ## Identificação da mulher
 `IDADE`
@@ -115,6 +115,12 @@ CO_AMBULATORIAL_SUS
 - `Dim_Municipio` é reutilizada com papel duplo na fato: `id_municipio_ocorrencia` (NOT NULL) e `id_municipio_residencia` (nullable).
 - `id_municipio_estabelecimento` **não** entra como FK na tabela-fato; é carregado na `Dim_EstabelecimentoSaude` (via `CO_IBGE` do CNES) e **pode** referenciar `Dim_Municipio`.
 
+### Decisão: Estabelecimento de Saúde (atributos do CNES)
+- `CO_AMBULATORIAL_SUS` entra **direto na tabela-fato**, normalizado para booleano (`"SIM"` → `True`; demais → `False`). É uma flag de baixo custo e congela o valor no momento do óbito.
+- `Dim_EstabelecimentoSaude` contém: `CO_CNES`, `NO_FANTASIA`, `CO_IBGE`, `CO_ESFERA_ADMINISTRATIVA`, `TP_UNIDADE`, `NO_BAIRRO` e `CO_NATUREZA_JUR`.
+  - Obs.: "CO_NATUREZA_JURIDICA" (terminologia usada nas decisões) corresponde ao campo `CO_NATUREZA_JUR` na base CNES.
+- Os demais campos do CNES **não** entram no modelo por ora.
+
 ### Decisão: CID como Role-Playing Dimension
 - `Dim_CID` é reutilizada com papel duplo na fato: `id_causa_basica` (NOT NULL, derivada de `CAUSABAS`) e `id_causa_original` (nullable, derivada de `CAUSABAS_O`).
 - As 2 FKs apontam para a mesma `Dim_CID` — *role-playing dimension*
@@ -131,13 +137,14 @@ CO_AMBULATORIAL_SUS
 - `Dim_Municipio`: id_municipio (PK), codigo_ibge (7 dígitos), nome_municipio, id_uf (FK → Dim_UF)
 
 **Hierarquia Estabelecimentos de Saúde (snowflake):**
-- `Dim_EstabelecimentoSaude`: id_estabelecimento (PK), codigo_cnes, nome_estabelecimento, id_municipio (FK → Dim_Municipio, via `CO_IBGE` do CNES)
+- `Dim_EstabelecimentoSaude`: id_estabelecimento (PK), codigo_cnes (`CO_CNES`), nome_fantasia (`NO_FANTASIA`), codigo_ibge (`CO_IBGE`), id_municipio (FK → Dim_Municipio, via `CO_IBGE` do CNES), esfera_administrativa (`CO_ESFERA_ADMINISTRATIVA`), tipo_unidade (`TP_UNIDADE`), bairro (`NO_BAIRRO`), natureza_juridica (`CO_NATUREZA_JUR`)
 
-- `Dim_Tempo`: id_tempo (PK), data_completa, dia, mes, ano, trimestre, semestre
+- `Dim_Tempo`: id_tempo (PK), ano (derivado de `DTOBITO`) — simplificada: sem dia, mês, trimestre ou semestre
 - `Dim_FaixaEtaria`: id_faixa_etaria (PK), faixa ("10-14","15-19",...,"45-49"), idade_min, idade_max
 - `Dim_RacaCor`: id_raca_cor (PK), codigo (1,2,3,4,5,9), descricao (Branca,Preta,Amarela,Parda,Indígena,Ignorado)
 - `Dim_LocalOcorrencia`: id_local_ocorrencia (PK), codigo (1,2,3,4,5,6,9), descricao (Hospital,Outros est. saúde,Domicílio,Via pública,Outros,Aldeia indígena,Ignorado) — derivada de `LOCOCOR`
 - `Dim_MomentoGravidez` (role-playing): id_momento_gravidez (PK), codigo, descricao (Durante gravidez,No parto/aborto,Até 42 dias pós-parto,43d a 1 ano pós-parto,Não se aplica) — alimentada por `TPMORTEOCO` (papel `id_momento_gravidez`) e por `TPOBITOCOR` (papel `id_momento_gravidez_pos_investigacao`)
+- `Dim_CID` (role-playing): id_cid (PK), codigo_cid (VARCHAR(4), ex: "O95"), descricao (descrição da causa — fonte CID10.DBF), capitulo (capítulo CID-10, ex: "Capítulo XV – Gravidez, parto e puerpério"), categoria (3 caracteres iniciais, ex: "O95") — alimentada por `CAUSABAS` (papel `id_causa_basica`) e por `CAUSABAS_O` (papel `id_causa_original`)
 
 **Dimensões de Investigação (separadas, restritas ao universo `mif`):**
 > Decisão: os atributos de investigação dos óbitos **não** serão mais modelados como hierarquia snowflake (`Dim_Investigacao`). Cada atributo mantido vira uma **dimensão independente** que entra diretamente na tabela-fato com sua própria FK — isso elimina uma dimensão artificial que agruparia campos semanticamente distintos.
@@ -162,6 +169,7 @@ Colunas:
     id_causa_basica (FK, NOT NULL, de CAUSABAS), 
     id_causa_original (FK, nullable, de CAUSABAS_O), 
     recebeu_assistencia_medica (bool, de ASSISTMED normalizado), 
+    atendimento_ambulatorial_sus (bool, de CO_AMBULATORIAL_SUS normalizado: "SIM" → True), 
     id_nivel_investigador (FK, nullable → Dim_NivelInvestigador), 
     id_resgate_info (FK, nullable → Dim_ResgateInfo), 
     id_faixa_dias_investigacao (FK, nullable → Dim_FaixaDiasInvestigacao), 
@@ -170,12 +178,8 @@ Colunas:
 Conferência FK: todas as dimensões listadas possuem FK na tabela-fato — `Dim_Tempo` (id_tempo), `Dim_Municipio` (id_municipio_ocorrencia, id_municipio_residencia), `Dim_FaixaEtaria` (id_faixa_etaria), `Dim_RacaCor` (id_raca_cor), `Dim_LocalOcorrencia` (id_local_ocorrencia), `Dim_EstabelecimentoSaude` (id_estabelecimento_saude), `Dim_MomentoGravidez` (id_momento_gravidez, id_momento_gravidez_pos_investigacao), `Dim_CID` (id_causa_basica, id_causa_original), `Dim_NivelInvestigador` (id_nivel_investigador), `Dim_ResgateInfo` (id_resgate_info), `Dim_FaixaDiasInvestigacao` (id_faixa_dias_investigacao). `Dim_Regiao` e `Dim_UF` são alcançadas via `Dim_Municipio` (snowflake).
 
 # Pendências
-- Conferir se existe necessidade de granularidade do dia ou se ano é suficiente.
-- Escrever a definição completa da `Dim_CID` (associada a `id_causa_basica` e `id_causa_original`).
 - Dicionarizar os atributos do CNES aqui nesse arquivo modelo.md
 - conferir `LOCOCOR` contra a informação de tipo do estabelecimento de saúde registrado no CNES.
 - conferir a quantidade real de dígitos nos 3 atributos que referenciam municipios, olhando os registros reais.
 - conferir `id_municipio_estabelecimento` do CNES contra `CODMUNOCOR` registrado no SIM.
-- decidir se as informações do CNES entram direto na tabela-fato ou se na tabela-fato entra apenas o codigo do estabelecimento.
-- Escrever as dimensões secundarias com os atributos do CNES que serão ligados à DIM_EstabelecimentoSaude
 
