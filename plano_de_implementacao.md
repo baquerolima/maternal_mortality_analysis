@@ -347,7 +347,7 @@ Grão: combinação única de dimensões (1 registro por combinação)
 
 ### Como referência:
 - `modelo.md` — Modelo dimensional e decisões de EDA (fonte da verdade)
-- `arquivos/links_arquivos.md` — Links para download dos arquivos do SIM, CNES e códigos do IBGE
+- `arquivos/links_arquivos.md` — Links para download dos arquivos do SIM, CNES, Domínios do CNES e códigos do IBGE
 - `exploracoes/analisa_variaveis_dim.ipynb` — EDA que validou as decisões de colunas
 - `sus_etl/database.py` — Conexão PostgreSQL + engine SQLAlchemy
 - `sus_etl/processing.py` — Padrão de carga staging (referência)
