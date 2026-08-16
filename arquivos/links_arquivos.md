@@ -43,6 +43,9 @@
 |CNES|https://s3.sa-east-1.amazonaws.com/ckan.saude.gov.br/CNES/cnes_estabelecimentos_csv.zip|
 |Domínios CNES|https://cnes.datasus.gov.br/EstatisticasServlet?path=SCNES_DOMINIOS.ZIP|
 |Códigos IBGE|https://geoftp.ibge.gov.br/organizacao_do_territorio/estrutura_territorial/divisao_territorial/2024/DTB_2024.zip|
+|Fatores de Correção|https://svs.aids.gov.br/daent/acesso-a-informacao/acoes-e-programas/captura-recaptura/mortalidade/FC_materno_infantil.xlsx|
+|Razão de Mortalidade Materna|https://svs.aids.gov.br/daent/acesso-a-informacao/acoes-e-programas/captura-recaptura/mortalidade/razao-mortalidade-materna.xlsx|
 
 # Outros links interessantes
 https://ourworldindata.org/maternal-mortality
+https://svs.aids.gov.br/daent/acesso-a-informacao/acoes-e-programas/captura-recaptura/mortalidade/
