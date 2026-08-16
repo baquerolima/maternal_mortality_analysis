@@ -20,11 +20,11 @@
 
 ## Municipio
 `CODMUNRES`
-    Codigo do municipio com até 7 dígitos, porém maioria dos registros possui 6 dígitos. 
+    Codigo do municipio — usaremos a raiz do código IBGE (6 dígitos). 
     Desse atributo deriva a dimensão municipio_residencia.
 
 `CODMUNOCOR`
-    Codigo do municipio, porém maioria dos registros possui 6 dígitos. 
+    Codigo do municipio — usaremos a raiz do código IBGE (6 dígitos). 
     Desse atributo deriva a dimensão municipio_ocorrencia.
 
 ## Circunstâncias do óbito
@@ -108,13 +108,20 @@ CO_AMBULATORIAL_SUS
 - **Schema**: Snowflake (hierarquias normalizadas)
 
 ### Decisão: Município como Role-Playing Dimension
-- `Dim_Municipio` é reutilizada com papel duplo na fato: `id_municipio_ocorrencia` (NOT NULL) e `id_municipio_residencia` (nullable).
-- `id_municipio_estabelecimento` **não** entra como FK na tabela-fato; é carregado na `Dim_EstabelecimentoSaude` (via `CO_IBGE` do CNES) e **pode** referenciar `Dim_Municipio`.
+- `Dim_Municipio` usa a **chave natural** `codigo_ibge` (6 dígitos, raiz do código IBGE) como PK.
+- `Dim_Municipio` é reutilizada com papel duplo na fato: `codigo_ibge_ocorrencia` (NOT NULL, de `CODMUNOCOR`) e `codigo_ibge_residencia` (nullable, de `CODMUNRES`).
+- O `codigo_ibge` do estabelecimento **não** entra como FK na tabela-fato; é carregado na `Dim_EstabelecimentoSaude` (via `CO_IBGE` do CNES) e **pode** referenciar `Dim_Municipio`.
+- **Registro sentinela**: códigos de município ausentes/inválidos em `CODMUNOCOR` (FK `codigo_ibge_ocorrencia`, NOT NULL) e em `CO_IBGE` do CNES são mapeados para `999999` ("Município não identificado") em `Dim_Municipio` — evita quebrar essas FKs naturais. Para `CODMUNRES` (FK `codigo_ibge_residencia`, nullable), ausente/inválido permanece `NULL`.
 
 ### Decisão: Estabelecimento de Saúde (atributos do CNES)
 - `CO_AMBULATORIAL_SUS` entra **direto na tabela-fato**, normalizado para booleano (`"SIM"` → `True`; demais → `False`). É uma flag de baixo custo e congela o valor no momento do óbito.
-- `Dim_EstabelecimentoSaude` contém: `CO_CNES`, `NO_FANTASIA`, `CO_IBGE`, `CO_ESFERA_ADMINISTRATIVA`, `TP_UNIDADE`, `NO_BAIRRO` e `CO_NATUREZA_JUR`.
-  - Obs.: "CO_NATUREZA_JURIDICA" (terminologia usada nas decisões) corresponde ao campo `CO_NATUREZA_JUR` na base CNES.
+- `Dim_EstabelecimentoSaude` usa a **chave natural** `codigo_cnes` (`CO_CNES`) como PK e contém: `NO_FANTASIA`, `codigo_ibge` (6 dígitos, raiz do código IBGE — FK → `Dim_Municipio`, via `CO_IBGE` do CNES) e `NO_BAIRRO`.
+- **Registro sentinela**: `CODESTAB`/`CO_CNES` ausentes ou inválidos são mapeados para `9999999` ("Estabelecimento não identificado") em `Dim_EstabelecimentoSaude` — evita quebrar a FK natural `codigo_cnes` da fato.
+- `CO_ESFERA_ADMINISTRATIVA`, `TP_UNIDADE`, `CO_NATUREZA_JUR` e `TP_GESTAO` viram **sub-dimensões** de `Dim_EstabelecimentoSaude`, pois precisamos mapear seus códigos e, talvez, criar agrupamentos de códigos em análise posterior:
+  - `Dim_EsferaAdministrativa` (`CO_ESFERA_ADMINISTRATIVA`)
+  - `Dim_TipoUnidade` (`TP_UNIDADE`)
+  - `Dim_NaturezaJuridica` (`CO_NATUREZA_JUR`)
+  - `Dim_TipoGestao` (`TP_GESTAO`)
 - Os demais campos do CNES **não** entram no modelo por ora.
 
 ### Decisão: CID como Role-Playing Dimension
@@ -134,13 +141,17 @@ CO_AMBULATORIAL_SUS
 **Hierarquia Geográfica (snowflake):**
 - `Dim_Regiao`: id_regiao (PK), nome_regiao (Norte, Nordeste, Sudeste, Sul, Centro-Oeste)
 - `Dim_UF`: id_uf (PK), nome_uf, sigla_uf, id_regiao (FK → Dim_Regiao)
-- `Dim_Municipio`: id_municipio (PK), codigo_ibge (7 dígitos), nome_municipio, id_uf (FK → Dim_UF)
+- `Dim_Municipio`: codigo_ibge (PK, 6 dígitos, raiz do código IBGE), nome_municipio, id_uf (FK → Dim_UF)
 
 **Hierarquia Estabelecimentos de Saúde (snowflake):**
-- `Dim_EstabelecimentoSaude`: id_estabelecimento (PK), codigo_cnes (`CO_CNES`), nome_fantasia (`NO_FANTASIA`), codigo_ibge (`CO_IBGE`), id_municipio (FK → Dim_Municipio, via `CO_IBGE` do CNES), esfera_administrativa (`CO_ESFERA_ADMINISTRATIVA`), tipo_unidade (`TP_UNIDADE`), bairro (`NO_BAIRRO`), natureza_juridica (`CO_NATUREZA_JUR`)
+- `Dim_EstabelecimentoSaude`: codigo_cnes (PK, `CO_CNES`), nome_fantasia (`NO_FANTASIA`), codigo_ibge (`CO_IBGE`, 6 dígitos, FK → Dim_Municipio), bairro (`NO_BAIRRO`), id_esfera_administrativa (FK → Dim_EsferaAdministrativa), id_tipo_unidade (FK → Dim_TipoUnidade), id_natureza_juridica (FK → Dim_NaturezaJuridica), id_tipo_gestao (FK → Dim_TipoGestao)
+- `Dim_EsferaAdministrativa`: id_esfera_administrativa (PK), codigo (`CO_ESFERA_ADMINISTRATIVA`), descricao
+- `Dim_TipoUnidade`: id_tipo_unidade (PK), codigo (`TP_UNIDADE`), descricao
+- `Dim_NaturezaJuridica`: id_natureza_juridica (PK), codigo (`CO_NATUREZA_JUR`), descricao
+- `Dim_TipoGestao`: id_tipo_gestao (PK), codigo (`TP_GESTAO`), descricao
 
 - `Dim_Tempo`: id_tempo (PK), ano (derivado de `DTOBITO`) — simplificada: sem dia, mês, trimestre ou semestre
-- `Dim_FaixaEtaria`: id_faixa_etaria (PK), faixa ("10-14","15-19",...,"45-49"), idade_min, idade_max
+- `Dim_FaixaEtaria`: id_faixa_etaria (PK), faixa ("Até 14 anos","15-19",...,"45-49","Acima de 49 anos"), idade_min, idade_max
 - `Dim_RacaCor`: id_raca_cor (PK), codigo (1,2,3,4,5,9), descricao (Branca,Preta,Amarela,Parda,Indígena,Ignorado)
 - `Dim_LocalOcorrencia`: id_local_ocorrencia (PK), codigo (1,2,3,4,5,6,9), descricao (Hospital,Outros est. saúde,Domicílio,Via pública,Outros,Aldeia indígena,Ignorado) — derivada de `LOCOCOR`
 - `Dim_MomentoGravidez` (role-playing): id_momento_gravidez (PK), codigo, descricao (Durante gravidez,No parto/aborto,Até 42 dias pós-parto,43d a 1 ano pós-parto,Não se aplica) — alimentada por `TPMORTEOCO` (papel `id_momento_gravidez`) e por `TPOBITOCOR` (papel `id_momento_gravidez_pos_investigacao`)
@@ -158,12 +169,12 @@ CO_AMBULATORIAL_SUS
 **1. Fact_MorteMaterna** — grão: combinação única de dimensões
 Colunas: 
     id_tempo (FK), 
-    id_municipio_ocorrencia (FK, NOT NULL), 
-    id_municipio_residencia (FK, nullable), 
+    codigo_ibge_ocorrencia (FK, NOT NULL), 
+    codigo_ibge_residencia (FK, nullable), 
     id_faixa_etaria (FK), 
     id_raca_cor (FK), 
     id_local_ocorrencia (FK), 
-    id_estabelecimento_saude (FK), 
+    codigo_cnes (FK), 
     id_momento_gravidez (FK, de TPMORTEOCO), 
     id_momento_gravidez_pos_investigacao (FK, nullable, de TPOBITOCOR), 
     id_causa_basica (FK, NOT NULL, de CAUSABAS), 
@@ -176,11 +187,10 @@ Colunas:
     id_faixa_dias_investigacao (FK, nullable → Dim_FaixaDiasInvestigacao), 
     **quantidade_obitos** (INT, measure)
 
-Conferência FK: todas as dimensões listadas possuem FK na tabela-fato — `Dim_Tempo` (id_tempo), `Dim_Municipio` (id_municipio_ocorrencia, id_municipio_residencia), `Dim_FaixaEtaria` (id_faixa_etaria), `Dim_RacaCor` (id_raca_cor), `Dim_LocalOcorrencia` (id_local_ocorrencia), `Dim_EstabelecimentoSaude` (id_estabelecimento_saude), `Dim_MomentoGravidez` (id_momento_gravidez, id_momento_gravidez_pos_investigacao), `Dim_CID` (id_causa_basica, id_causa_original), `Dim_NivelInvestigador` (id_nivel_investigador), `Dim_ResgateInfo` (id_resgate_info), `Dim_FaixaDiasInvestigacao` (id_faixa_dias_investigacao). `Dim_Regiao` e `Dim_UF` são alcançadas via `Dim_Municipio` (snowflake).
+Conferência FK: todas as dimensões listadas possuem FK na tabela-fato — `Dim_Tempo` (id_tempo), `Dim_Municipio` (codigo_ibge_ocorrencia, codigo_ibge_residencia), `Dim_FaixaEtaria` (id_faixa_etaria), `Dim_RacaCor` (id_raca_cor), `Dim_LocalOcorrencia` (id_local_ocorrencia), `Dim_EstabelecimentoSaude` (codigo_cnes), `Dim_MomentoGravidez` (id_momento_gravidez, id_momento_gravidez_pos_investigacao), `Dim_CID` (id_causa_basica, id_causa_original), `Dim_NivelInvestigador` (id_nivel_investigador), `Dim_ResgateInfo` (id_resgate_info), `Dim_FaixaDiasInvestigacao` (id_faixa_dias_investigacao). `Dim_Regiao` e `Dim_UF` são alcançadas via `Dim_Municipio` (snowflake).
 
 # Pendências
-- Dicionarizar os atributos do CNES aqui nesse arquivo modelo.md
+- Dicionarizar os atributos do CNES aqui nesse arquivo modelo.md (incluindo códigos/descrições das sub-dimensões `Dim_EsferaAdministrativa`, `Dim_TipoUnidade`, `Dim_NaturezaJuridica` e `Dim_TipoGestao`).
 - conferir `LOCOCOR` contra a informação de tipo do estabelecimento de saúde registrado no CNES.
-- conferir a quantidade real de dígitos nos 3 atributos que referenciam municipios, olhando os registros reais.
-- conferir `id_municipio_estabelecimento` do CNES contra `CODMUNOCOR` registrado no SIM.
+- conferir `codigo_ibge` do estabelecimento (CNES) contra `CODMUNOCOR` registrado no SIM.
 

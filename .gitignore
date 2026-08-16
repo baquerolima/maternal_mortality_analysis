@@ -1,4 +1,7 @@
-arquivos/*
+arquivos/SIM/*
+arquivos/SINASC/*
+arquivos/CNES/*
+arquivos/documentos/*
 .venv/*
 venv/*
 .ipynb_checkpoints/
@@ -7,3 +10,4 @@ modelo_dimensional/
 .env*
 .github/
 dados_2014.csv
+*.csv
