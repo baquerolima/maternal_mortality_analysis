@@ -41,8 +41,8 @@
 |Arquivo|link|
 |---|---|
 |CNES|https://s3.sa-east-1.amazonaws.com/ckan.saude.gov.br/CNES/cnes_estabelecimentos_csv.zip|
+|Domínios CNES|https://cnes.datasus.gov.br/EstatisticasServlet?path=SCNES_DOMINIOS.ZIP|
 |Códigos IBGE|https://geoftp.ibge.gov.br/organizacao_do_territorio/estrutura_territorial/divisao_territorial/2024/DTB_2024.zip|
-
 
 # Outros links interessantes
 https://ourworldindata.org/maternal-mortality
